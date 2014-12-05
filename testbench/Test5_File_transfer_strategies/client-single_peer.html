@@ -1,0 +1,365 @@
+<!DOCTYPE HTML> 
+<html lang="en"> 
+<head>
+<title>PeerJS Hello World Code Example</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
+<meta http-equiv="Content-Language" content="en-us"> 
+
+<script type="text/javascript" src="../../deps/jquery.min.js"></script> 
+<script type="text/javascript" src="../../deps/peer.js"></script>
+<script>
+
+    // This is a very simple code example. See chat.html for a more involved
+    // example.
+    
+    var num_peers = 5;
+    var num_iterations = 30;
+    
+    var selectedStrategy = 0;
+    
+    var conns = new Array();
+    var i=0;
+    
+    var downloadStartTimes = {};
+    var numDownloadsCompletePerConn = {};
+    var downloadTimeMeas = [];
+    var numDownloadsComplete = 0;
+    var numOpenConnections = 0;
+    var numIterationsComplete = 0;
+    var totalTimes = [];
+  
+    $(document).ready(function() {
+        document.querySelector( '#button1' ).onclick = function() {
+            
+            selectedStrategy = select1.selectedIndex;
+            console.log("Selected strategy: " + selectedStrategy);
+
+            connectPeers();             
+        };        
+        button2.onclick = function() {
+            downloadData();
+        };
+    });
+    
+    function downloadData() {
+        
+        $('#helloworld').append("=== Iteration [" + (numIterationsComplete+1) + " / " + num_iterations + "] ===<br>");
+        window.scrollTo(0, document.body.scrollHeight);
+        
+        if (selectedStrategy == 0)
+        {
+            startTime = Date.now();
+            var c = conns[0];
+            c.send("giveMeFile");
+            
+        }
+        
+        if (selectedStrategy == 1)
+        {
+            startTime = Date.now();
+            for (s_peer_num=0; s_peer_num<num_peers; s_peer_num++)
+            {
+                var c = conns[s_peer_num];
+                numDownloadsCompletePerConn[c.id] = 0;
+                downloadStartTimes[c.id] = Date.now();
+                c.send("giveMeFile");
+            }
+            
+        }
+        
+        if (selectedStrategy == 2)
+        {
+            startTime = Date.now();
+            for (s_peer_num=0; s_peer_num<num_peers; s_peer_num++)
+            {
+                var c = conns[s_peer_num];
+                numDownloadsCompletePerConn[c.id] = 0;
+                downloadStartTimes[c.id] = Date.now();
+                console.log(c.id + ": sending request to " + c.peer);
+                c.send("giveMeFile");
+            }
+        }
+    
+    }
+
+    function connectPeers() {
+        // Create a new Peer with our demo API key, with debug set to true so we can
+        // see what's going on.
+        peer1 = new Peer('test5_c_peer_1', {host: '/', port: 9000, path: '/'});
+        
+        peer1.on('error', function(err) {
+            console.log(err);
+            $('#helloworld').append("[error]: " + err);
+        });
+        
+        // The `open` event signifies that the Peer is ready to connect with other
+        // Peers and, if we didn't provide the Peer with an ID, that an ID has been
+        // assigned by the server.
+        peer1.on('open', function(id){
+
+            if (selectedStrategy == 0)
+            {
+                var c = peer1.connect("test5_s_peer_0", {reliable: true});
+                conns[0] = c;
+                c.on('open', function()
+                {
+                    $('#helloworld').append("[" + id + "] connected to [" + this.peer + "]<br>");
+                    numOpenConnections = numOpenConnections + 1;
+                    if (numOpenConnections == 1)
+                    {                            
+                        button2.disabled = false;
+                        
+                    }
+                });
+                c.on('data', function(data)
+                {
+                    numDownloadsComplete = numDownloadsComplete + 1;
+                    
+                    if (numDownloadsComplete == 10)
+                    {
+
+                        var totalTime = Date.now() - startTime;
+                        
+                        $('#helloworld').append("Total download time: " + totalTime + "<br><br>");
+                        
+                        numDownloadsComplete = 0;
+                        downloadStartTimes = {};
+                        downloadTimeMeas = [];
+
+                        totalTimes.push(totalTime);
+                        numIterationsComplete = numIterationsComplete + 1;
+                        if (numIterationsComplete < num_iterations)
+                        {
+                            setTimeout(function() {
+                                    downloadData();
+                            }, 500);
+                            
+                        }
+                        else
+                        {
+                            var avgDLTime = average(totalTimes).toFixed(2);
+                            var stdDevDLTime = standardDeviation(totalTimes).toFixed(2);
+                            
+                            $('#helloworld').append("Average download time: " + avgDLTime + "<br>");
+                            $('#helloworld').append("Standard deviation: " + stdDevDLTime + "<br>");
+                            numIterationsComplete = 0;
+                        }
+                    }
+                    else
+                    {
+                        c.send("giveMeFile");
+                    }
+                });
+            }
+            
+            if (selectedStrategy == 1)
+            {
+                for (s_peer_num=0; s_peer_num<num_peers; s_peer_num++)
+                {
+                    var c = peer1.connect("test5_s_peer_0", {reliable: true});
+                    conns[s_peer_num] = c;
+                    c.on('open', function()
+                    {
+                        numDownloadsCompletePerConn[this.id] = 0;
+                        $('#helloworld').append("[" + id + "] connected to [" + this.peer + "]<br>");
+                        numOpenConnections = numOpenConnections + 1;
+                        if (numOpenConnections == num_peers)
+                        {                            
+                            button2.disabled = false;
+                            
+                        }
+                    });
+                    c.on('data', function(data)
+                    {
+                        var downloadTime = Date.now() - downloadStartTimes[this.id];
+                        downloadTimeMeas.push(downloadTime);
+                        numDownloadsComplete = numDownloadsComplete + 1;                        
+                        if (numDownloadsComplete == 10)
+                        {
+                            $('#helloworld').append("Individual download times: " + JSON.stringify(downloadTimeMeas) + "<br>");
+                            var totalTime = Date.now() - startTime;;
+                            $('#helloworld').append("Total download time: " + totalTime + "<br><br>");
+                            
+                            numDownloadsComplete = 0;
+                            downloadStartTimes = {};
+                            downloadTimeMeas = [];
+                            
+                            
+                            totalTimes.push(totalTime);
+                            numIterationsComplete = numIterationsComplete + 1;
+                            if (numIterationsComplete < num_iterations)
+                            {
+                                setTimeout(function() {
+                                    downloadData();
+                                }, 500);
+                            }
+                            else
+                            {
+                                var avgDLTime = average(totalTimes).toFixed(2);
+                                var stdDevDLTime = standardDeviation(totalTimes).toFixed(2);
+                                
+                                $('#helloworld').append("Average download time: " + avgDLTime + "<br>");
+                                $('#helloworld').append("Standard deviation: " + stdDevDLTime + "<br>");
+                                numIterationsComplete = 0;
+                            }
+                        }
+                        numDownloadsCompletePerConn[this.id] = numDownloadsCompletePerConn[this.id]+1;
+                        if (num_peers == 5 && numDownloadsCompletePerConn[this.id] < 2)
+                        {
+                            c.send("giveMeFile");
+                        }
+
+                    });
+                }
+            }
+            
+            if (selectedStrategy == 2)
+            {
+                for (s_peer_num=0; s_peer_num<num_peers; s_peer_num++)
+                {
+                    var c = peer1.connect("test5_s_peer_" + s_peer_num, {reliable: true});
+                    conns[s_peer_num] = c;
+                    c.on('open', function()
+                    {
+                        numDownloadsCompletePerConn[this.id] = 0;
+                        $('#helloworld').append("[" + id + "] connected to [" + this.peer + "]<br>");
+                        numOpenConnections = numOpenConnections + 1;
+                        if (numOpenConnections == num_peers)
+                        {                            
+                            button2.disabled = false;
+                            
+                        }
+                    });
+                    c.on('data', function(data)
+                    {
+//                         console.log(this.id + ": got data from " + this.peer);
+                        var downloadTime = Date.now() - downloadStartTimes[this.id];
+//                         console.log(JSON.stringify(downloadStartTimes));
+                        downloadTimeMeas.push(downloadTime);
+                        numDownloadsComplete = numDownloadsComplete + 1;
+                        
+//                         console.log("Downloads complete: " + numDownloadsComplete);
+                        
+                        numDownloadsCompletePerConn[this.id] = numDownloadsCompletePerConn[this.id]+1;
+                        
+//                         console.log(this.id + ": " + numDownloadsCompletePerConn[this.id]);
+                        
+                        if (numDownloadsComplete == 10)
+                        {
+                            $('#helloworld').append("Individual download times: " + JSON.stringify(downloadTimeMeas) + "<br>");
+                            var totalTime = Date.now() - startTime;;
+                            $('#helloworld').append("Total download time: " + totalTime + "<br><br>");
+                            
+                            numDownloadsComplete = 0;
+                            downloadStartTimes = {};
+                            downloadTimeMeas = [];                            
+                            
+                            totalTimes.push(totalTime);
+                            numIterationsComplete = numIterationsComplete + 1;
+                            if (numIterationsComplete < num_iterations)
+                            {
+                                setTimeout(function() {
+                                    downloadData();
+                                }, 500);
+                                
+                            }
+                            else
+                            {
+                                var avgDLTime = average(totalTimes).toFixed(2);
+                                var stdDevDLTime = standardDeviation(totalTimes).toFixed(2);
+                                
+                                $('#helloworld').append("Average download time: " + avgDLTime + "<br>");
+                                $('#helloworld').append("Standard deviation: " + stdDevDLTime + "<br>");
+                                numIterationsComplete = 0;
+                            }
+                        }
+                        if (num_peers == 5 && numDownloadsCompletePerConn[this.id] < 2)
+                        {
+//                             console.log(this.id + ": sending request to " + this.peer);
+                            this.send("giveMeFile");
+                        }
+                        
+                    });
+                }
+            }
+        
+            
+        });
+    }
+  
+    function sleep(milliseconds) {
+        var start = new Date().getTime();
+        for (var i = 0; i < 1e7; i++) {
+            if ((new Date().getTime() - start) > milliseconds){
+            break;
+            }
+        }
+    }
+    
+    function standardDeviation(values){
+    var avg = average(values);
+    var squareDiffs = values.map(function(value){
+        var diff = value - avg;
+        var sqrDiff = diff * diff;
+        return sqrDiff;
+    });
+    var avgSquareDiff = average(squareDiffs);
+    var stdDev = Math.sqrt(avgSquareDiff);
+    return stdDev;
+    }
+    function average(data){
+        var sum = data.reduce(function(sum, value){
+            return sum + value;
+        }, 0);
+        var avg = sum / data.length;
+        return avg;
+    }
+    
+
+</script>
+<style>
+  #helloworld {
+    font-size: 12px;
+    padding: 20px;
+    background-color: #4dace2;
+    border: 1px solid #0C6BA1;
+    max-width: 600px;
+    min-height: 300px;
+  }
+  #browsers {
+    font-weight: 600;
+  }
+  .warning {
+    max-width: 600px;
+    padding: 20px;
+    background-color: #eee;
+    border: 1px solid #ccc;
+    font-size: 18px;
+  }
+  .browserinfo {
+    max-width: 400px;
+    padding: 5px;
+    border: 1px solid #ccc;
+    background-color: #f8f8f8;
+  }
+  a {
+    font-weight: 600;
+  }
+</style>
+</head> 
+ 
+<body> 
+    <h2>WebRTC client</h2>
+    Choose your data transfer strategy: <br>
+    <select id ="select1">
+        <option value="strategy1">1. One file at a time from a single peer</option>
+        <option value="strategy2">2. Multiple files (10) simultaneously from a single peer</option>
+        <option value="strategy3">3. Multiple files (10) simultaneously from multiple (10) peers</option>
+    </select> 
+    <button id="button1" style="height:50px; width:100px">Connect!</button>
+    <br>
+    <button id="button2" style="height:50px; width:100px" disabled="true">Start download!</button>
+    <div class="browserinfo"><h3>WebRTC connection log</h3></div>
+    <div id="helloworld"></div>
+</body> 
+</html> 

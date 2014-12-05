@@ -1,0 +1,212 @@
+<!DOCTYPE HTML> 
+<html lang="en"> 
+<head>
+<title>PeerJS Hello World Code Example</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
+<meta http-equiv="Content-Language" content="en-us"> 
+
+<script type="text/javascript" src="../../deps/jquery.min.js"></script> 
+<script type="text/javascript" src="../../deps/peer.js"></script>
+<script>
+
+    // This is a very simple code example. See chat.html for a more involved
+    // example.
+    
+    var num_peers = 1;
+    var num_iterations = 100;
+    
+    var conns = new Array();
+    var i=0;
+    var servConTimeMeas = [], peerConTimeMeas = [], totalConTimeMeas = [];
+    
+    
+  
+    $(document).ready(function() {
+        document.querySelector( '#button1' ).onclick = function() { 
+            num_iterations = input1.value;
+            connectPeers();             
+        };        
+    });
+
+    function connectPeers() {
+        i=i+1;
+        $('#helloworld').append("=== [iteration " + i + " / " + num_iterations + "] ===<br>");
+        var startTimeStamp, servConTimeStamp, peerConTimeStamp;
+        var servConTime, peerConTime, totalConTime;
+        
+        // Create a new Peer with our demo API key, with debug set to true so we can
+        // see what's going on.
+        startTimeStamp = Date.now();
+        peer1 = new Peer('test1_c_peer', {host: '/', port: 9000, path: '/'});
+        peer1.on('close', function() {
+            setTimeout(function()
+            {
+                connectPeers();
+            }, 2000);
+        });
+        
+        peer1.on('error', function(err) {
+            console.log(err);
+            $('#helloworld').append("[error]: " + err);
+        });
+        
+        // The `open` event signifies that the Peer is ready to connect with other
+        // Peers and, if we didn't provide the Peer with an ID, that an ID has been
+        // assigned by the server.
+        peer1.on('open', function(id){
+            servConTimeStamp = Date.now();
+//             var msg1 = "[" + id + "] peer connected to server and ready to connect with other peers";
+//             $('#helloworld').append(msg1 + "<br>");
+//             console.log(msg1);
+                
+            for (s_peer_num=0; s_peer_num<num_peers; s_peer_num++)
+            {            
+                var c = peer1.connect("test1_s_peer_" + s_peer_num, {reliable: true});
+                conns[s_peer_num] = c;
+                c.on('open', function()
+                {
+                    peerConTimeStamp = Date.now();
+//                     var msg2 = "[" + id + "] connected to [" + this.peer + "]";
+//                     $('#helloworld').append(msg2 + "<br>");
+//                     console.log(msg2);
+                    
+                    servConTime = servConTimeStamp - startTimeStamp;
+                    peerConTime = peerConTimeStamp - servConTimeStamp;
+                    totalConTime = peerConTimeStamp - startTimeStamp;
+                    
+                    servConTimeMeas.push(servConTime);
+                    peerConTimeMeas.push(peerConTime);
+                    totalConTimeMeas.push(totalConTime);
+                    
+                    var servConTimeMsg = "[" + id + "] server connection establishment time: " + (servConTime);
+                    var peerConTimeMsg = "[" + id + "] peer connection establishment time: " + (peerConTime);
+                    var totalConTimeMsg = "[" + id + "] total connection establishment time: " + (totalConTime);
+                    
+                    $('#helloworld').append(servConTimeMsg + "<br>");
+                    console.log(servConTimeMsg);
+                    $('#helloworld').append(peerConTimeMsg + "<br>");
+                    console.log(peerConTimeMsg);
+                    $('#helloworld').append(totalConTimeMsg + "<br><br>");
+                    console.log(totalConTimeMsg);
+                    
+                    
+                    
+//                     this.send('Hello ' + this.peer);
+//                     var msg3 = "[" + id + "] sent hello message to [" + this.peer + "]";
+//                     $('#helloworld').append(msg3 + "<br>");
+//                     console.log(msg3);
+                    if (i<num_iterations)
+                    {
+                        setTimeout(function() {
+                            peer1.destroy();
+                        }, 500);
+                    }
+                    else
+                    {
+                        var stdDevServConTime = standardDeviation(servConTimeMeas).toFixed(2);
+                        var stdDevPeerConTime = standardDeviation(peerConTimeMeas).toFixed(2);
+                        var stdDevTotalConTime = standardDeviation(totalConTimeMeas).toFixed(2);
+                        
+                        var avgServConTime = average(servConTimeMeas).toFixed(2);
+                        var avgPeerConTime = average(peerConTimeMeas).toFixed(2);
+                        var avgTotalConTime = average(totalConTimeMeas).toFixed(2);
+                        
+                        
+                        var msgAvg = "<br>Average signaling server connection time: <b>" + avgServConTime
+                        + "</b><br>Average peer connection time: <b>" + avgPeerConTime
+                        + "</b><br>Average total connection time: <b>" + avgTotalConTime + "</b><br>";
+                        $('#helloworld').append(msgAvg);
+                        
+                        var msgDev = "<br>stdev signaling server connection time: <b>" + stdDevServConTime
+                        + "</b><br>stdev peer connection time: <b>" + stdDevPeerConTime
+                        + "</b><br>stdev total connection time: <b>" + stdDevTotalConTime + "<br></b>";
+                        $('#helloworld').append(msgDev);
+                                               
+
+//                         numQueries = 0; parseAverage = 0; parseSum = 0; queryAverage = 0; querySum = 0;
+//                         queryTimeMeas = []; parseTimeMeas = [];                   
+                        
+                    }
+                    window.scrollTo(0, document.body.scrollHeight);
+                });
+                c.on('data', function(data)
+                {
+                    var msg = "[" + id + "] received data from [" + this.peer + "]: " + data.byteLength + " bytes";
+                    $('#helloworld').append(msg + "<br>");
+                    console.log(msg);
+                    
+                });
+            }
+        });
+    }
+  
+    function sleep(milliseconds) {
+        var start = new Date().getTime();
+        for (var i = 0; i < 1e7; i++) {
+            if ((new Date().getTime() - start) > milliseconds){
+            break;
+            }
+        }
+    }
+    
+    function standardDeviation(values){
+    var avg = average(values);
+    var squareDiffs = values.map(function(value){
+        var diff = value - avg;
+        var sqrDiff = diff * diff;
+        return sqrDiff;
+    });
+    var avgSquareDiff = average(squareDiffs);
+    var stdDev = Math.sqrt(avgSquareDiff);
+    return stdDev;
+    }
+    function average(data){
+        var sum = data.reduce(function(sum, value){
+            return sum + value;
+        }, 0);
+        var avg = sum / data.length;
+        return avg;
+    }
+    
+
+</script>
+<style>
+  #helloworld {
+    font-size: 12px;
+    padding: 20px;
+    background-color: #4dace2;
+    border: 1px solid #0C6BA1;
+    max-width: 600px;
+    min-height: 300px;
+  }
+  #browsers {
+    font-weight: 600;
+  }
+  .warning {
+    max-width: 600px;
+    padding: 20px;
+    background-color: #eee;
+    border: 1px solid #ccc;
+    font-size: 18px;
+  }
+  .browserinfo {
+    max-width: 400px;
+    padding: 5px;
+    border: 1px solid #ccc;
+    background-color: #f8f8f8;
+  }
+  a {
+    font-weight: 600;
+  }
+</style>
+</head> 
+ 
+<body> 
+  <h2>WebRTC client</h2>
+  Num of iterations:
+  <input id="input1" type="number" value=100></textarea>
+  <button id="button1" style="height:50px; width:100px">Start!</button>
+  <div class="browserinfo"><h3>WebRTC connection log</h3></div>
+  <div id="helloworld"></div>
+</body> 
+</html> 

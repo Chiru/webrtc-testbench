@@ -1,0 +1,189 @@
+<!DOCTYPE HTML> 
+<html lang="en"> 
+<head>
+<title>PeerJS Hello World Code Example</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
+<meta http-equiv="Content-Language" content="en-us"> 
+
+<script type="text/javascript" src="../../deps/jquery.min.js"></script> 
+<script type="text/javascript" src="../../deps/peer.js"></script>
+<script>
+  // This is a very simple code example. See chat.html for a more involved
+  // example.
+
+  var num_peers = 100;
+  
+  var zip_data;
+  
+  var peers = {}
+  
+  $(document).ready(function() {
+  
+    document.querySelector( '#button1' ).onclick = function() { 
+        num_peers = parseInt(input1.value);
+        startPeers();
+    };      
+
+//     var xhr = new XMLHttpRequest();
+//     xhr.onreadystatechange = function()
+//     {
+//         if (xhr.status == 200 && xhr.readyState == 4)
+//         {            
+//             zip_data = new Blob([xhr.response], {type: "application/zip"});
+//             var msg = "File received: " + zip_data.size + " bytes";
+//             $('#helloworld').append(msg + "<br>");
+//             console.log(msg);
+//         }
+//     
+//     }
+//     xhr.open("GET", "../data/data1.zip");
+//     xhr.responseType = "arraybuffer";
+//     xhr.send();
+    
+    // Create a new Peer with our demo API key, with debug set to true so we can
+    // see what's going on.
+
+    
+/*    
+    // Create another Peer with our demo API key to connect to.
+    peer2 = new Peer('peer_2', {host: '/', port: 9000, path: '/'});
+
+    // The `open` event signifies that the Peer is ready to connect with other
+    // Peers and, if we didn't provide the Peer with an ID, that an ID has been
+    // assigned by the server.
+    peer1.on('open', function(id){
+      peerId1 = id;
+      console.log("peerId1: " + peerId1);
+
+      var c = peer2.connect(peerId1);
+      c.on('data', function(data) {
+        // When we receive 'Hello', send ' world'.
+        $('#helloworld').append(data);
+        c.send(' peer');
+      });
+    });
+
+    // Wait for a connection from the second peer.
+    peer1.on('connection', function(connection) {
+      // This `connection` is a DataConnection object with which we can send
+      // data.
+      // The `open` event firing means that the connection is now ready to
+      // transmit data.
+      connection.on('open', function() {
+        // Send 'Hello' on the connection.
+        connection.send('Hello,');
+      });
+      // The `data` event is fired when data is received on the connection.
+      connection.on('data', function(data) {
+        // Append the data to body.
+        $('#helloworld').append(data);
+      });
+    });
+
+    // Show browser version
+    $('#browsers').text(navigator.userAgent);*/
+  });
+  
+    function startPeers() {
+        for (peer_num = 0; peer_num < num_peers; peer_num++)
+        {
+            var peer_id = "test3_s_peer_" + (peer_num+1);
+            var peer = new Peer(peer_id, {host: '/', port: 9000, path: '/'});
+            peers[peer_id] = peer;
+            
+            peer.on('error', function(err) {
+                console.log(err);
+                $('#helloworld').append("[error]: " + this.id + " " + err + "<br>");
+            })
+            
+            peer.on('open', function() {
+                $('#helloworld').append("[" + this.id + "]: ready to receive connections <br>");
+            });
+            
+            peer.on('connection', function(connection) {
+                
+                var myID = this.id;
+                
+                var msg1 = "[" + myID + "] received SIGNALING connection from peer [" + connection.peer + "]";
+                $('#helloworld').append(msg1 + "<br>");
+                console.log(msg1);
+            // This `connection` is a DataConnection object with which we can send
+            // data.
+            // The `open` event firing means that the connection is now ready to
+            // transmit data.
+
+            // The `data` event is fired when data is received on the connection.
+                
+                connection.on('open', function() {
+                    var msg1 = "[" + myID + "] received P2P connection from peer [" + connection.peer + "]";
+                    $('#helloworld').append(msg1 + "<br>");
+                    console.log(msg1);
+                });
+                
+
+                
+                connection.on('data', function(data) {
+                    // Append the data to body.
+                    var msg2 = "[" + myID + "] received data from peer [" + connection.peer + "]: " + data;
+                    $('#helloworld').append(msg2 + "<br>");
+                    console.log(msg2);
+                    
+    //                 this.send(zip_data);
+    //                 
+    //                 var msg3 = "[" + myID + "] sent ZIP data to peer [" + connection.peer + "]: " + zip_data.size;
+    //                 $('#helloworld').append(msg3 + "<br>");
+    //                 console.log(msg3);
+        //             $('#helloworld').append(data);
+                });
+            });
+            
+        }
+        
+        var msg = "Initiated " + Object.keys(peers).length + " peers, waiting for incoming connections and data";
+        console.log(msg);
+        $('#helloworld').append(msg + "<br>");
+    }
+
+
+</script>
+<style>
+  #helloworld {
+    font-size: 12px;
+    padding: 20px;
+    background-color: #4dace2;
+    border: 1px solid #0C6BA1;
+    max-width: 600px;
+    min-height: 300px;
+  }
+  #browsers {
+    font-weight: 600;
+  }
+  .warning {
+    max-width: 600px;
+    padding: 20px;
+    background-color: #eee;
+    border: 1px solid #ccc;
+    font-size: 18px;
+  }
+  .browserinfo {
+    max-width: 400px;
+    padding: 5px;
+    border: 1px solid #ccc;
+    background-color: #f8f8f8;
+  }
+  a {
+    font-weight: 600;
+  }
+</style>
+</head> 
+ 
+<body>
+<h2>WebRTC server</h2>
+  Num of server peers to start:
+  <input id="input1" type="number" value=10></textarea>
+  <button id="button1" style="height:50px; width:100px">Start peers!</button>
+  <div class="browserinfo"><h3>WebRTC connection log</h3></div>
+  <div id="helloworld"></div>
+
+</body> 
+</html> 
